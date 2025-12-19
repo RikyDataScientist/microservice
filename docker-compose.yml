@@ -1,0 +1,91 @@
+services:
+  api-gateway:
+    image: nginx:alpine
+    container_name: api-gateway
+    depends_on:
+      - auth-service
+      - acad-service
+    ports:
+      - "8081:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - microservices-network
+
+  # Auth Service
+  auth-service:
+    build: ./auth-service
+    container_name: auth-service
+    cpus: 0.5
+    mem_limit: 512m
+    depends_on:
+      - auth-db
+    environment:
+      - NODE_ENV=development
+      - PORT=3001
+      - MONGO_URI=mongodb://auth-db:27017/auth
+      - JWT_SECRET=6cedd4e3de39ace0d401e12e9661bac17ec15e485d7a8d219ee72233c75208e2
+    ports:
+      - "3001:3001"
+    networks:
+      - microservices-network
+    volumes:
+      - ./auth-service:/app
+      - /app/node_modules
+
+  # Auth Database
+  auth-db:
+    image: mongo:6.0
+    container_name: auth-db
+    restart: always
+    networks:
+      - microservices-network
+    volumes:
+      - auth-data:/data/db
+    ports:
+      - "27017:27017"
+
+  acad-service:
+    build: ./acad-service
+    container_name: acad-service
+    depends_on:
+      - acad-db
+    environment:
+      - DB_HOST=acad-db
+      - DB_PORT=5432
+      - DB_NAME=acad-database
+      - DB_USER=xyssummon
+      - DB_PASSWORD=soal-uas-akso
+    ports:
+      - "3002:3002"
+    networks:
+      - microservices-network
+    volumes:
+      - ./acad-service:/app
+
+  acad-db:
+    image: postgres:16
+    container_name: acad-db
+    environment:
+      - POSTGRES_USER=xyssummon
+      - POSTGRES_PASSWORD=soal-uas-akso
+      - POSTGRES_DB=acad-database
+    ports:
+      - "5432:5432"
+    networks:
+      - microservices-network
+    volumes:
+      - product-data:/var/lib/postgresql/data
+      - ./acad-service/db_kelas.sql:/docker-entrypoint-initdb.d/db_kelas.sql:ro
+
+networks:
+  microservices-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.16.0.0/28
+
+volumes:
+  auth-data:
+  product-data:
+  order-data:
